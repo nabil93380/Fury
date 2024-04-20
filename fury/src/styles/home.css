@@ -1,0 +1,64 @@
+/* styles.css */
+
+/* Styles généraux */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+  }
+  
+  header {
+    background-color: #3498db;
+    color: white;
+    padding: 20px;
+    text-align: center;
+  }
+  
+  nav ul {
+    list-style-type: none;
+    padding: 0;
+  }
+  
+  nav ul li {
+    display: inline;
+    margin-right: 10px;
+  }
+  
+  nav ul li a {
+    color: white;
+    text-decoration: none;
+  }
+  
+  main {
+    padding: 20px;
+  }
+  
+  /* Mise en page pour les fonctionnalités */
+  .features {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+  }
+  
+  .feature {
+    width: 300px;
+    margin-bottom: 20px;
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+  
+  /* Media queries pour le design responsive */
+  @media screen and (max-width: 768px) {
+    header {
+      padding: 10px;
+    }
+  
+    main {
+      padding: 10px;
+    }
+  
+    .feature {
+      width: 100%;
+    }
+  }
