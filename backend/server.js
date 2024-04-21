@@ -3,12 +3,13 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const app = express();
-const PORT = process.env.PORT || 5000;
+
 // Charger les variables d'environnement
 require('dotenv').config();
 // Utiliser les variables d'environnement pour accéder au mot de passe de la base de données
 const dbUsername = process.env.DB_USERNAME;
 const dbPassword = process.env.DB_PASSWORD;
+const PORT = process.env.PORT;
 
 // Autoriser toutes les requêtes CORS
 app.use(cors());
@@ -16,7 +17,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Connexion à MongoDB Atlas
-const MONGODB_URI = 'mongodb+srv://${dbUsername}:${dbPassword}@fury.gdvwmrw.mongodb.net/';
+const MONGODB_URI = `mongodb+srv://${dbUsername}:${dbPassword}@fury.gdvwmrw.mongodb.net/`;
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('Connecté à MongoDB'))
   .catch(err => console.error('Erreur de connexion à MongoDB :', err));
