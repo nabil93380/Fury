@@ -34,15 +34,23 @@ const Form = mongoose.model('Form', FormSchema);
 
 // Définition du schéma MongoDB
 const cvSchema = new mongoose.Schema({
-  section: String,
-  content: String,
+  sections: [{
+    section: String,
+    content: String
+  }]
 });
 const CV = mongoose.model('CV', cvSchema);
 
 // Route pour télécharger le CV
 app.post('/upload-cv', upload.single('cv'), async (req, res) => {
+   // Vérification que le fichier est bien reçu
+   console.log(`req.file : `,req.file);
+   if (!req.file) {
+    return res.status(400).send('No file uploaded.');
+}
   try {
 const result = await mammoth.extractRawText({ buffer: req.file.buffer });
+console.log(result.value);
     const sections = extractSections(result.value);
     await saveSectionsToMongoDB(sections); // Attendre la sauvegarde des sections
     
@@ -65,7 +73,7 @@ function extractSections(cvText) {
     cvTitle: /(\bTitre\b\s*(du\s*CV)?|Objectif):\s*([^\n]+)/i,
     skills: /(\bCompétences\b|\bSkills\b):\s*([^\n]+)/i,
     softSkills: /(\bSoft\s*Skills\b):\s*([^\n]+)/i,
-    education: /(\bDiplômes\b|\bEducation\b|\bFormation\b):\s*([^\n]+)/i,
+    education: /(\DIPLOME\b|\bEducation\b|\bFormation\b):\s*([^\n]+)/i,
     experience: /(\bExpérience\s*professionnelle\b|\bExperience\b):\s*([\s\S]+?)(?=(\b\w+\b\s*:|$))/gi,
     certification: /(\bCertifications\b|\bCertification\b):\s*([^\n]+)/i
   };
@@ -76,7 +84,7 @@ function extractSections(cvText) {
       if (match) {
           const section = {
               section: sectionName,
-              content: match[3] ? match[3].trim() : '' // Vérifie si match[2] est défini avant d'appeler trim()
+              content: match[2] ? match[2].trim() : '' // Vérifie si match[2] est défini avant d'appeler trim()
           };
           sections.push(section);
       }
@@ -88,16 +96,22 @@ function extractSections(cvText) {
 // Fonction pour sauvegarder les sections extraites dans MongoDB
 async function saveSectionsToMongoDB(sections) {
  try {
-      const cv = new CV(); // Créer un nouveau document CV
-      sections.forEach(section => {
-          /*cv[section.section] = section.content; // Stocker les données de la section dans le document CV*/
-          cv.section = section.section; // Assigne le nom de la section
-          cv.content = section.content; // Assigne le contenu de la section
-          console.log(`Section: ${section.section}`);
-          console.log(`Contenu: ${section.content}`);
-          console.log('\n'); // Pour une séparation visuelle entre les sections
-      });
-      await cv.save(); // Sauvegarder le document CV dans la base de données MongoDB
+        // Crée un nouveau document CV
+        const cv = new CV();
+
+        // Parcours chaque section et stocke-la dans le document CV
+        sections.forEach(section => {
+          cv.sections.push({
+            section: section.section,
+            content: section.content
+        });
+        console.log(`Section: ${section.section}`);
+        console.log(`Contenu: ${section.content}`);
+        console.log('\n'); // Pour une séparation visuelle entre les sections
+        });
+
+        // Sauvegarde le document CV dans la base de données MongoDB
+        await cv.save();
   } catch (error) {
       console.error('Failed to save CV sections to MongoDB:', error);
       throw new Error('Failed to save CV sections to MongoDB');
