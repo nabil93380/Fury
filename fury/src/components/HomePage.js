@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { Link } from 'react-router-dom';
 import '../styles/home.css';
 
 function HomePage() {
@@ -21,10 +22,11 @@ function HomePage() {
         <p>Votre Application RH offre une suite complète d'outils pour la gestion efficace des ressources humaines.</p>
       </section>
       <section className="features">
-        <div className="feature">
-          <h3>Importation de CV</h3>
-          <p>Importer les CV à enregistrer en base.</p>
-        </div>
+          <div className="feature">
+            <h3>Importation de CV</h3>
+            <p>Importation et découpage en section du CV.</p>
+            <Link to="/upload-cv" className="btn-upload">Importer un CV</Link>
+          </div>
         <div className="feature">
           <h3>Tri et Classification de CV</h3>
           <p>Fournir à l'IA les CV à classer selon un Ordre de Mission.</p>
