@@ -3,9 +3,10 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const app = express();
+const { spawn } = require('child_process');
 const multer = require('multer');
-const mammoth = require('mammoth');
 const upload = multer({ storage: multer.memoryStorage() });
+
 // Charger les variables d'environnement
 require('dotenv').config();
 // Utiliser les variables d'environnement pour accéder au mot de passe de la base de données
@@ -39,43 +40,88 @@ const cvSchema = new mongoose.Schema({
     content: String
   }]
 });
-const CV = mongoose.model('CV', cvSchema);
+const CvModel = mongoose.model('cv', cvSchema);
 
 // Route pour télécharger le CV
-app.post('/upload-cv', upload.single('cv'), async (req, res) => {
-   // Vérification que le fichier est bien reçu
-   console.log(`req.file : `,req.file);
-   if (!req.file) {
+app.post('/upload-cv', upload.single('cv'), (req, res) => {
+
+  // Vérification que le fichier est bien reçu
+  console.log(`req.file : `,req.file);
+  if (!req.file) {
     return res.status(400).send('No file uploaded.');
 }
-  try {
-const result = await mammoth.extractRawText({ buffer: req.file.buffer });
-console.log(result.value);
-    const sections = extractSections(result.value);
-    await saveSectionsToMongoDB(sections); // Attendre la sauvegarde des sections
-    
-    // Une fois que les sections ont été extraites et sauvegardées, vous pouvez supprimer le fichier de la mémoire
-    delete req.file.buffer;
-    res.send({ message: 'CV data extracted and saved successfully' });
-  } catch (error) {
-    console.error('Failed to upload CV:', error);
-    res.status(500).send({ error: 'Failed to upload CV' });
+  // Récupérer les données du fichier depuis req.file.buffer
+  const cvBuffer = req.file.buffer;
+  // Exécuter un script Python pour traiter le fichier Word
+  const pythonProcess = spawn('python', ['C:\\Users\\Nabil\\Documents\\ScriptPython\\regex.py', cvBuffer]);
+  // Stocker les sections extraites du CV
+  let cvSections = {};
+  // Gérer la sortie du script Python
+  pythonProcess.stdout.on('data', (data) => {
+        // Traiter les données renvoyées par le script Python
+        try {
+          cvSections = JSON.parse(data);
+          console.log(cvSections);
+      } catch (error) {
+          console.error('Erreur lors de la conversion des données JSON :', error);
+          return res.status(500).send('Internal Server Error');
+      }
+      });
+      // Gérer les erreurs éventuelles
+    pythonProcess.stderr.on('data', (data) => {
+      // Afficher les erreurs éventuelles
+      console.error(`Erreur dans le script Python : ${data}`);
+  });
+
+  pythonProcess.on('close', async(code) => {
+    console.log(`Le script Python s'est terminé avec le code ${code}`);
+
+    // Vérifier que les sections du CV ont été correctement extraites
+    if (Object.keys(cvSections).length === 0) {
+      console.error('Aucune section n\'a été extraite du CV');
+      return res.status(500).send('Internal Server Error');
   }
+    
+      try {
+        // Enregistrer les sections extraites dans la base de données avec Mongoose
+        const newCv = new CvModel();
+
+              // Parcours chaque section et stocke-la dans le document CV
+              Object.entries(cvSections).forEach(([sectionName, sectionContent]) => {
+                const content = Array.isArray(sectionContent) ? sectionContent.join('\n') : String(sectionContent);
+                newCv.sections.push({
+                  section: sectionName,
+                  content: content
+                });
+                console.log(`Section: ${sectionName}`);
+                console.log(`Contenu: ${sectionContent}`);
+                console.log('\n'); // Pour une séparation visuelle entre les sections
+              });
+
+        await newCv.save();
+        console.log('Sections du CV enregistrées dans MongoDB');
+        // Répondre à la requête HTTP avec un message de succès
+        res.send('Traitement du CV terminé et sections enregistrées dans MongoDB');
+      } catch (err) {
+        console.error('Erreur lors de l\'insertion des données :', err);
+        return res.status(500).send('Internal Server Error');
+      }
+  });
 });
 
 // Fonction pour extraire les sections du CV
-function extractSections(cvText) {
+/*function extractSections(cvText) {
      const sections = [];
   
   // Expression régulière pour extraire les données
   const regexes = {
-    name: /(\bNom\b|\bPrénom\b):\s*([^\n]+)/i,
-    cvTitle: /(\bTitre\b\s*(du\s*CV)?|Objectif):\s*([^\n]+)/i,
-    skills: /(\bCompétences\b|\bSkills\b):\s*([^\n]+)/i,
-    softSkills: /(\bSoft\s*Skills\b):\s*([^\n]+)/i,
-    education: /(\DIPLOME\b|\bEducation\b|\bFormation\b):\s*([^\n]+)/i,
-    experience: /(\bExpérience\s*professionnelle\b|\bExperience\b):\s*([\s\S]+?)(?=(\b\w+\b\s*:|$))/gi,
-    certification: /(\bCertifications\b|\bCertification\b):\s*([^\n]+)/i
+    name: /(\bName\b|\bNom\b|\bPrénom\b):\s*([^\n]+)/i,
+    education: /(?:ETUDES ET FORMATIONS|EDUCATION ET FORMATION|EDUCATION):\s*([\s\S]+?)(?=\bCOMPETENCES\b|\bLANGUES\b|\bEXPERIENCE\b|\z)/i,
+    technicalSkills: /(?:COMPETENCES TECHNIQUES|TECHNICAL SKILLS|COMPETENCES TECHNIQUES ET FONCTIONNELLES):\s*([\s\S]+?)(?=\bCOMPETENCES\b|\bLANGUES\b|\bEXPERIENCE\b|\z)/i,
+    functionalSkills: /(?:COMPETENCES FONCTIONNELLES|FONCTIONAL SKILLS|COMPETENCES FONCTIONNELLES ET TECHNIQUES):\s*([\s\S]+?)(?=\bCOMPETENCES\b|\bLANGUES\b|\bEXPERIENCE\b|\z)/i,
+    experience: /(?:EXPERIENCE PROFESSIONNELLE|PROFESSIONAL EXPERIENCE|EXPERIENCE):\s*([\s\S]+?)(?=\bCOMPETENCES\b|\bLANGUES\b|\bETUDES\b|\z)/i,
+    languages: /(?:LANGUES|LANGUAGE):\s*([\s\S]+?)(?=\bEXPERIENCE\b|\z)/i
+
   };
 
   // Recherche de correspondances pour chaque section
@@ -97,7 +143,7 @@ function extractSections(cvText) {
 async function saveSectionsToMongoDB(sections) {
  try {
         // Crée un nouveau document CV
-        const cv = new CV();
+        const cv = new CvModel();
 
         // Parcours chaque section et stocke-la dans le document CV
         sections.forEach(section => {
@@ -116,7 +162,7 @@ async function saveSectionsToMongoDB(sections) {
       console.error('Failed to save CV sections to MongoDB:', error);
       throw new Error('Failed to save CV sections to MongoDB');
   }
-}
+}*/
 
 // Route pour inscrire un nouvel utilisateur
 app.post('/register', async (req, res) => {
